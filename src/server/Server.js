@@ -19,16 +19,8 @@ module.exports = Class(function() {
 			._route('/require/*', bind(requireServer, requireServer.handleRequest))
 		
 		var io = socketIO.listen(this._app)
-		this._clientsIO = io.of('/clients')
-		this._consolesIO = io.of('/consoles')
-		
-		this._clientsIO
-			.on('connection', bind(this, this._onClientConnect))
-			.on('disconnect', bind(this, this._onClientDisconnect))
-		
-		this._consolesIO
-			.on('connection', bind(this, this._onConsoleConnect))
-			.on('disconnect', bind(this, this._onConsoleDisconnect))
+		io.of('/clients').on('connection', bind(this, this._onClientConnect))
+		io.of('/consoles').on('connection', bind(this, this._onConsoleConnect))
 	}
 	
 	this.listen = function(port) {
@@ -63,22 +55,24 @@ module.exports = Class(function() {
 	this._onClientConnect = function(clientSocket) {
 		this._clientSockets[clientSocket.id] = clientSocket
 		each(this._consoleSockets, function(consoleSocket) {
-			consoleSocket.emit('ClientConnect', clientSocket.id)
+			consoleSocket.emit('ClientConnect', { id:clientSocket.id })
 		})
+		clientSocket.on('disconnect', bind(this, this._onClientDisconnect, clientSocket))
 	}
 	
 	this._onClientDisconnect = function(clientSocket) {
 		delete this._clientSockets[clientSocket.id]
 		each(this._consoleSockets, function(consoleSocket) {
-			consoleSocket.emit('ClientDisconnect', clientSocket.id)
+			consoleSocket.emit('ClientDisconnect', { id:clientSocket.id })
 		})
 	}
 	
 	this._onConsoleConnect = function(consoleSocket) {
 		this._consoleSockets[consoleSocket.id] = consoleSocket
 		each(this._clientSockets, function(clientSocket) {
-			consoleSocket.emit('ClientConnect', clientSocket.id)
+			consoleSocket.emit('ClientConnect', { id:clientSocket.id })
 		})
+		consoleSocket.on('disconnect', bind(this, this._onConsoleDisconnect, consoleSocket))
 	}
 	
 	this._onConsoleDisconnect = function(consoleSocket) {
