@@ -72,7 +72,15 @@ module.exports = Class(function() {
 		each(this._clientSockets, function(clientSocket) {
 			consoleSocket.emit('ClientConnect', { id:clientSocket.id })
 		})
-		consoleSocket.on('disconnect', bind(this, this._onConsoleDisconnect, consoleSocket))
+		consoleSocket
+			.on('ConsoleCommand', bind(this, this._handleConsoleCommand))
+			.on('disconnect', bind(this, this._onConsoleDisconnect, consoleSocket))
+	}
+	
+	this._handleConsoleCommand = function(message, callback) {
+		this._clientSockets[message.clientID].emit('ClientCommand', message.command, function(err, response) {
+			callback(err, response)
+		})
 	}
 	
 	this._onConsoleDisconnect = function(consoleSocket) {

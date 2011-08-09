@@ -1,6 +1,12 @@
-require('socket.io/node_modules/socket.io-client/dist/socket.io') // exposes "io" globally
+(function(){
+	require('socket.io/node_modules/socket.io-client/dist/socket.io') // exposes "io" globally
 
-var socket = io.connect('/clients')
-socket.on('Command', function (data) {
-	console.log("Command", data)
-})
+	io.connect('/clients').on('ClientCommand', function (command, callback) {
+		try {
+			callback(null, eval(command))
+		} catch(error) {
+			callback(error)
+		}
+	})
+	
+})()
