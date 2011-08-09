@@ -1,0 +1,15 @@
+{
+  "author": "Marcus Westin <narcvs@gmail.com> (http://marcuswest.in)",
+  "name": "remote-console",
+  "description": "A remote console for webapp development",
+  "version": "0.0.0",
+  "repository": {
+    "url": ""
+  },
+  "dependencies": {
+    "socket.io":"0.7.x",
+    "require":"0.4.x",
+    "express":"2.4.x",
+    "std":"0.1.25"
+  }
+}
