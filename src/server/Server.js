@@ -125,6 +125,7 @@ module.exports = Class(function() {
 		var session = this._sessions[sessionID]
 		if (session) {
 			this._socketToSession[socketID] = session
+			session.sockets.push(socketID)
 			callback(true)
 		} else {
 			console.log("REGISTER BAD SESSION", socketID, sessionID)
