@@ -10,7 +10,7 @@
     "socket.io":"0.7.x",
     "require":"0.4.x",
     "express":"2.4.x",
-    "std":"0.1.25",
+    "std":"0.1.x",
     "ui":"0.2.x",
     "store":"1.1.x"
   }
