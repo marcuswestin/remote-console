@@ -106,6 +106,8 @@ module.exports = Class(function() {
 			delete session.timeout
 			if (session.sockets.length) { return }
 			this._broadcast('SessionDead', session)
+			delete this._sessions[session.id]
+			delete this._sessionEvents[session.id]
 		}), this._sessionTimeout)
 	}
 
