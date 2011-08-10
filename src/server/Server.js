@@ -92,10 +92,10 @@ module.exports = Class(function() {
 		}))
 	}
 	
-	this._removeSessionSocket = function(sockets, socketID) {
-		for (var i=0, socket; socket = sockets[i]; i++) {
-			if (socket.id != socketID) { continue }
-			sockets.splice(i, 1)
+	this._removeSessionSocket = function(socketIDs, targetSocketID) {
+		for (var i=0, socketID; socketID = socketIDs[i]; i++) {
+			if (socketID != targetSocketID) { continue }
+			socketIDs.splice(i, 1)
 			break
 		}
 	}
