@@ -122,7 +122,13 @@ module.exports = Class(function() {
 	
 	this._registerSessionClient = function(socketID, sessionID, callback) {
 		var session = this._sessions[sessionID]
-		callback(!!session)
+		if (session) {
+			this._socketToSession[socketID] = session
+			callback(true)
+		} else {
+			console.log("REGISTER BAD SESSION", socketID, sessionID)
+			callback(false)
+		}
 	}
 	
 	this._withSession = function(socketID, callback) {
