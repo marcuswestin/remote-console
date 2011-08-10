@@ -103,7 +103,8 @@ module.exports = Class(function() {
 	this._scheduleCheckSession = function(session) {
 		if (session.timeout) { clearTimeout(session.timeout) }
 		session.timeout = setTimeout(bind(this, function() {
-			if (session.tabs) { return }
+			delete session.timeout
+			if (session.sockets.length) { return }
 			this._broadcast('SessionDead', session)
 		}), this._sessionTimeout)
 	}
