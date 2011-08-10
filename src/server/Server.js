@@ -4,35 +4,47 @@ var express = require('express'),
 	bind = require('std/bind'),
 	each = require('std/each'),
 	fs = require('fs'),
-	requireServer = require('require/server')
+	requireServer = require('require/server'),
+	time = require('std/time')
 
 module.exports = Class(function() {
 	
+	this._sessionTimeout = 10 + time.seconds
+	
 	this.init = function() {
+		this._sessions = {}
+		this._socketToSession = {}
 		this._clientSockets = {}
 		this._consoleSockets = {}
 		
 		this._app = express.createServer()
-		this
-			._route('/client', bind(this, this._serveFile, 'src/client/client.html', 'text/html'))
-			._route('/console', bind(this, this._serveFile, 'src/console/console.html', 'text/html'))
-			._route('/require/*', bind(requireServer, requireServer.handleRequest))
-		
-		var io = socketIO.listen(this._app)
-		io.of('/clients').on('connection', bind(this, this._onClientConnect))
-		io.of('/consoles').on('connection', bind(this, this._onConsoleConnect))
+		this._setupHTTPRoutes()
+		this._setupSocketRoutes()
 	}
 	
 	this.listen = function(port) {
 		requireServer.addReplacement("'object' === typeof module ? module.exports : (window.io = {})", "window.io = {}")
-		requireServer.setOpts({
-			path: __dirname + '/../',
-			root: 'require',
-			port: port,
-			host: 'localhost'
-		})
-		
+		requireServer.setOpts({ path: __dirname + '/../', root: 'require', port: port, host: 'localhost' })
 		this._app.listen(port)
+	}
+	
+	/* HTTP routing
+	 **************/
+	this._setupHTTPRoutes = function() {
+		function redirect(path) {
+			return function(req, res) { res.redirect(path) }
+		}
+		this
+			._route('/', redirect('/console/'))
+			
+			._route('/client/', bind(this, this._serveFile, 'src/client/client.html', 'text/html'))
+			._route('/client', redirect('/client/'))
+			
+			._route('/console/console.css', bind(this, this._serveFile, 'src/console/console.css', 'text/css'))
+			._route('/console/', bind(this, this._serveFile, 'src/console/console.html', 'text/html'))
+			._route('/console', redirect('/console/'))
+			
+			._route('/require/*', bind(requireServer, requireServer.handleRequest))
 	}
 	
 	this._route = function(route, handler) {
@@ -42,48 +54,114 @@ module.exports = Class(function() {
 	
 	this._serveFile = function(path, contentType, req, res, next) {
 		fs.readFile(path, 'utf8', function(err, content) {
-			if (err) {
-				res.writeHead(400)
-				res.end()
-				return
-			}
+			if (err) { res.writeHead(400); res.end(); return }
 			res.writeHead(200, { 'Content-Type':contentType })
 			res.end(content)
 		})
 	}
 	
-	this._onClientConnect = function(clientSocket) {
-		this._clientSockets[clientSocket.id] = clientSocket
-		each(this._consoleSockets, function(consoleSocket) {
-			consoleSocket.emit('ClientConnect', { id:clientSocket.id })
-		})
-		clientSocket.on('disconnect', bind(this, this._onClientDisconnect, clientSocket))
+	/* Socket routing
+	 ****************/
+	this._setupSocketRoutes = function() {
+		var io = socketIO.listen(this._app)
+		io.of('/clients').on('connection', bind(this, this._onClientSocket))
+		io.of('/consoles').on('connection', bind(this, this._onConsoleSocket))
 	}
 	
-	this._onClientDisconnect = function(clientSocket) {
-		delete this._clientSockets[clientSocket.id]
-		each(this._consoleSockets, function(consoleSocket) {
-			consoleSocket.emit('ClientDisconnect', { id:clientSocket.id })
-		})
+	/* Client sessions and sockets
+	 *****************************/
+	this._onClientSocket = function(clientSocket) {
+		var socketID = clientSocket.id
+		this._clientSockets[socketID] = clientSocket
+		
+		clientSocket
+			.on('CreateSession', bind(this, this._createClientSession, socketID))
+			.on('disconnect', bind(this, this._onClientDisconnect, socketID))
+			.on('ClientEvent', bind(this, this._onClientEvent, socketID))
+		
+		this._withSession(socketID, bind(this, this._scheduleCheckSession))
 	}
 	
-	this._onConsoleConnect = function(consoleSocket) {
-		this._consoleSockets[consoleSocket.id] = consoleSocket
-		each(this._clientSockets, function(clientSocket) {
-			consoleSocket.emit('ClientConnect', { id:clientSocket.id })
-		})
+	this._onClientDisconnect = function(socketID) {
+		delete this._clientSockets[socketID]
+		this._withSession(socketID, bind(this, function(session) {
+			this._removeSessionSocket(session.sockets, socketID)
+			delete this._socketToSession[socketID]
+			this._scheduleCheckSession(session)
+		}))
+	}
+	
+	this._removeSessionSocket = function(sockets, socketID) {
+		for (var i=0, socket; socket = sockets[i]; i++) {
+			if (socket.id != socketID) { continue }
+			sockets.splice(i, 1)
+			break
+		}
+	}
+	
+	this._scheduleCheckSession = function(session) {
+		if (session.timeout) { clearTimeout(session.timeout) }
+		session.timeout = setTimeout(bind(this, function() {
+			if (session.tabs) { return }
+			this._broadcast('SessionDead', session)
+		}), this._sessionTimeout)
+	}
+
+	this._createClientSession = function(socketID, clientInfo, callback) {
+		// todo read navigator out of clientInfo
+		var session = { id:new Date().getTime()+'-'+Math.random(), navigator:'Unknown', sockets:[socketID] }
+		this._sessions[session.id] = session
+		this._socketToSession[socketID] = session
+		callback(session.id)
+		this._broadcast('SessionInfo', session)
+	}
+	
+	this._withSession = function(socketID, callback) {
+		var session = this._socketToSession[socketID]
+		if (!session) { return }
+		callback(session)
+	}
+	
+	this._withSessionSockets = function(sessionID, callback) {
+		var session = this._sessions[sessionID]
+		if (!session) { return }
+		each(session.sockets, callback)
+	}
+	
+	this._onClientEvent = function(socketID, clientEvent) {
+		var session = this._sessions[socketID]
+		if (!session) { return this._clientSockets[socketID].emit('BadSession') }
+		clientEvent.session = session
+		this._broadcast('ClientEvent', clientEvent)
+	}
+	
+	/* Console connections
+	 *********************/
+	this._onConsoleSocket = function(consoleSocket) {
+		var socketID = consoleSocket.id
+		this._consoleSockets[socketID] = consoleSocket
+
 		consoleSocket
-			.on('ConsoleCommand', bind(this, this._handleConsoleCommand))
-			.on('disconnect', bind(this, this._onConsoleDisconnect, consoleSocket))
+			.on('ExecuteClientCommand', bind(this, this._handleConsoleCommand))
+			.on('disconnect', bind(this, function() { delete this._consoleSockets[socketID] }))
+
+		each(this._sessions, function(session) {
+			consoleSocket.emit('SessionInfo', session)
+		})
 	}
-	
+
 	this._handleConsoleCommand = function(message, callback) {
-		this._clientSockets[message.clientID].emit('ClientCommand', message.command, function(err, response) {
-			callback(err, response)
+		this._withSessionSockets(message.sessionID, function(clientSocket) {
+			clientSocket.emit('ExecuteClientCommand', message.command, function(data) {
+				this._broadcast('Response', { response:response, requestID:message.requestID })
+			})
 		})
 	}
 	
-	this._onConsoleDisconnect = function(consoleSocket) {
-		delete this._consoleSockets[consoleSocket.id]
-	}
+	this._broadcast = function(event, data) {
+		console.log("BROADCAST", event, data)
+		each(this._consoleSockets, function(consoleSocket) {
+			consoleSocket.emit(event, data)
+		})
+	}	
 })
