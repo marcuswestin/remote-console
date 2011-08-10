@@ -20,7 +20,7 @@ module.exports = Class(function () {
 		var sessionID = store.get(this._storeName)
 		if (!sessionID) { return this._createSession() }
 		this._socket.emit('RegisterSessionClient', sessionID, bind(this, function(session) {
-			if (!session) { return this._connectCallback() }
+			if (session) { return this._connectCallback() }
 			store.remove(this._storeName)
 			this._createSession()
 		}))
