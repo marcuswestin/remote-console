@@ -14,20 +14,22 @@ module.exports = Class(function () {
 		this._connectCallback = callback
 		this._socket = io.connect('/clients')
 		this._socket.on('connect', bind(this, this._onConnect))
-		this._socket.on('BadSession', bind(this, this._onBadSession))
-	}
-	
-	this._onBadSession = function() {
-		store.remove(this._storeName)
-		alert("We had a bad remote console session ID - please reload the page")
 	}
 	
 	this._onConnect = function() {
-		var sessionInfo = store.get(this._storeName)
-		if (sessionInfo) { return this._connectCallback() }
+		var sessionID = store.get(this._storeName)
+		if (!sessionID) { return this._createSession() }
+		this._socket.emit('RegisterSessionClient', sessionID, bind(this, function(session) {
+			if (!session) { return this._connectCallback() }
+			store.remove(this._storeName)
+			this._createSession()
+		}))
+	}
+	
+	this._createSession = function() {
 		var clientInfo = {}
-		this._socket.emit('CreateSession', clientInfo, bind(this, function(session) {
-			store.set(this._storeName, session)
+		this._socket.emit('CreateSession', clientInfo, bind(this, function(sessionID) {
+			store.set(this._storeName, sessionID)
 			this._connectCallback()
 		}))
 	}

@@ -76,6 +76,7 @@ module.exports = Class(function() {
 		
 		clientSocket
 			.on('CreateSession', bind(this, this._createClientSession, socketID))
+			.on('RegisterSessionClient', bind(this, this._registerSessionClient, socketID))
 			.on('disconnect', bind(this, this._onClientDisconnect, socketID))
 			.on('ClientEvent', bind(this, this._onClientEvent, socketID))
 		
@@ -114,6 +115,11 @@ module.exports = Class(function() {
 		this._socketToSession[socketID] = session
 		callback(session.id)
 		this._broadcast('SessionInfo', session)
+	}
+	
+	this._registerSessionClient = function(socketID, sessionID, callback) {
+		var session = this._sessions[sessionID]
+		callback(!!session)
 	}
 	
 	this._withSession = function(socketID, callback) {
