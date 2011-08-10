@@ -184,7 +184,6 @@ module.exports = Class(function() {
 	}
 	
 	this._broadcast = function(event, data) {
-		console.log("BROADCAST", event, data)
 		each(this._consoleSockets, function(consoleSocket) {
 			consoleSocket.emit(event, data)
 		})
