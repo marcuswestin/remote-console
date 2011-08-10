@@ -79,7 +79,7 @@ module.exports = Class(function() {
 			.on('CreateSession', bind(this, this._createClientSession, socketID))
 			.on('RegisterSessionClient', bind(this, this._registerSessionClient, socketID))
 			.on('disconnect', bind(this, this._onClientDisconnect, socketID))
-			.on('ClientEvent', bind(this, this._onClientEvent, socketID))
+			.on('ClientEvent', bind(this, this._registerClientEvent, socketID))
 		
 		this._withSession(socketID, bind(this, this._scheduleCheckSession))
 	}
@@ -87,6 +87,7 @@ module.exports = Class(function() {
 	this._onClientDisconnect = function(socketID) {
 		delete this._clientSockets[socketID]
 		this._withSession(socketID, bind(this, function(session) {
+			this._registerClientEvent(socketID, { type:'tab-disconnect' })
 			this._removeSessionSocket(session.sockets, socketID)
 			delete this._socketToSession[socketID]
 			this._scheduleCheckSession(session)
@@ -136,9 +137,14 @@ module.exports = Class(function() {
 		each(session.sockets, callback)
 	}
 	
-	this._onClientEvent = function(socketID, clientEvent) {
-		var session = this._sessions[socketID]
-		if (!session) { return this._clientSockets[socketID].emit('BadSession') }
+	this._registerClientEvent = function(socketID, clientEvent) {
+		var session = this._socketToSession[socketID]
+		if (!session) {
+			console.error("BAD SESSION", socketID)
+			// var socket = this._clientSockets[socketID]
+			// if (socket) { socket.emit('BadSession') }
+			return
+		}
 		clientEvent.sessionID = session.id
 		this._sessionEvents[session.id].push(clientEvent)
 		this._broadcast('ClientEvent', clientEvent)
