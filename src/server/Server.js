@@ -167,7 +167,7 @@ module.exports = Class(function() {
 			.on('disconnect', bind(this, function() { delete this._consoleSockets[socketID] }))
 
 		// Send events to console to catch up with current state of all sessions
-		each(this._sessions, function(session) {
+		each(this._sessions, this, function(session) {
 			consoleSocket.emit('SessionInfo', session)
 			each(this._sessionEvents[session.id], function(clientEvent) {
 				consoleSocket.emit('ClientEvent', clientEvent)
