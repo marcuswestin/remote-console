@@ -80,8 +80,6 @@ module.exports = Class(function() {
 			.on('RegisterSessionClient', bind(this, this._registerSessionClient, socketID))
 			.on('disconnect', bind(this, this._onClientDisconnect, socketID))
 			.on('ClientEvent', bind(this, this._registerClientEvent, socketID))
-		
-		this._withSession(socketID, bind(this, this._scheduleCheckSession))
 	}
 	
 	this._onClientDisconnect = function(socketID) {
