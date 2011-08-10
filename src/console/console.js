@@ -4,10 +4,14 @@ require('ui/dom').exposeGlobals()
 var Class = require('std/Class'),
 	bind = require('std/bind'),
 	UIComponent = require('ui/dom/Component'),
-	unique = require('std/unique')
+	unique = require('std/unique'),
+	on = require('ui/dom/on'),
+	getWindowSize = require('ui/dom/getWindowSize')
 
 var Console = Class(UIComponent, function() {
 	
+	this._class = 'Console'
+
 	this.init = function(socket) {
 		this._sessions = {}
 		this._outputs = {}
@@ -17,13 +21,25 @@ var Console = Class(UIComponent, function() {
 	}
 	
 	this.renderContent = function() {
-		this._sessionList = DIV('sessions').appendTo(this)
-		this._output = DIV('output').appendTo(this)
-		this._input = INPUT('input', { keypress:bind(this, this._onKeyPress) }).appendTo(this)
+		this.append(DIV(
+			this._sessionList = DIV('sessions'),
+			this._screen = DIV('screen',
+				this._output = DIV('output'),
+				this._input = INPUT('input', { keypress:bind(this, this._onKeyPress) })
+			)
+		))
+		on(window, 'resize', bind(this, this._layout))
+		this._layout()
+	}
+	
+	var listWidth = 300
+	this._layout = function() {
+		var size = getWindowSize(this.getWindow())
+		this._sessionList.style({ left:0, width:listWidth, height:size.height })
+		this._screen.style({ left:listWidth, width:size.width-listWidth, height:size.height })
 	}
 	
 	this._renderSession = function(session) {
-		console.log('_renderSession', session)
 		var node = this._sessions[session.id]
 		if (!node) {
 			node = this._sessions[session.id] = DIV('session', session.id,
