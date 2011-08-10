@@ -13,6 +13,7 @@ module.exports = Class(function() {
 	
 	this.init = function() {
 		this._sessions = {}
+		this._sessionEvents = {}
 		this._socketToSession = {}
 		this._clientSockets = {}
 		this._consoleSockets = {}
@@ -112,6 +113,7 @@ module.exports = Class(function() {
 		// todo read navigator out of clientInfo
 		var session = { id:new Date().getTime()+'-'+Math.random(), navigator:'Unknown', sockets:[socketID] }
 		this._sessions[session.id] = session
+		this._sessionEvents[session.id] = []
 		this._socketToSession[socketID] = session
 		callback(session.id)
 		this._broadcast('SessionInfo', session)
@@ -137,7 +139,8 @@ module.exports = Class(function() {
 	this._onClientEvent = function(socketID, clientEvent) {
 		var session = this._sessions[socketID]
 		if (!session) { return this._clientSockets[socketID].emit('BadSession') }
-		clientEvent.session = session
+		clientEvent.sessionID = session.id
+		this._sessionEvents[session.id].push(clientEvent)
 		this._broadcast('ClientEvent', clientEvent)
 	}
 	
@@ -151,8 +154,12 @@ module.exports = Class(function() {
 			.on('ExecuteClientCommand', bind(this, this._handleConsoleCommand))
 			.on('disconnect', bind(this, function() { delete this._consoleSockets[socketID] }))
 
+		// Send events to console to catch up with current state of all sessions
 		each(this._sessions, function(session) {
 			consoleSocket.emit('SessionInfo', session)
+			each(this._sessionEvents[session.id], function(clientEvent) {
+				consoleSocket.emit('ClientEvent', clientEvent)
+			})
 		})
 	}
 
