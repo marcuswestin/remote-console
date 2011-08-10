@@ -32,11 +32,16 @@ var Console = Class(UIComponent, function() {
 		this._layout()
 	}
 	
-	var listWidth = 300
+	var listWidth = 300,
+		inputHeight = 40
 	this._layout = function() {
-		var size = getWindowSize(this.getWindow())
+		var size = getWindowSize(this.getWindow()),
+			screenWidth = size.width-listWidth
+		
 		this._sessionList.style({ left:0, width:listWidth, height:size.height })
-		this._screen.style({ left:listWidth, width:size.width-listWidth, height:size.height })
+		this._screen.style({ left:listWidth, width:screenWidth, height:size.height })
+		this._input.style({ width:screenWidth-90, height:inputHeight-100 })
+		this._output.style({ height:size.height-inputHeight })
 	}
 	
 	this._renderSession = function(session) {
