@@ -5,6 +5,7 @@ var express = require('express'),
 	each = require('std/each'),
 	fs = require('fs'),
 	requireServer = require('require/server'),
+	unique = require('std/unique'),
 	time = require('std/time')
 
 module.exports = Class(function() {
@@ -78,18 +79,19 @@ module.exports = Class(function() {
 		clientSocket
 			.on('CreateSession', bind(this, this._createClientSession, socketID))
 			.on('RegisterSessionClient', bind(this, this._registerSessionClient, socketID))
+			.on('CommandResponse', bind(this, this._onCommandResponse, socketID))
 			.on('disconnect', bind(this, this._onClientDisconnect, socketID))
 			.on('ClientEvent', bind(this, this._registerClientEvent, socketID))
 	}
 	
 	this._onClientDisconnect = function(socketID) {
 		delete this._clientSockets[socketID]
-		this._withSession(socketID, bind(this, function(session) {
-			this._registerClientEvent(socketID, { type:'tab-disconnect' })
+		this._withSession(socketID, function(session) {
+			this._registerSessionEvent(session, { type:'tab-disconnect', socketID:socketID })
 			this._removeSessionSocket(session.sockets, socketID)
 			delete this._socketToSession[socketID]
 			this._scheduleCheckSession(session)
-		}))
+		})
 	}
 	
 	this._removeSessionSocket = function(socketIDs, targetSocketID) {
@@ -100,10 +102,12 @@ module.exports = Class(function() {
 		}
 	}
 	
+	this._sessionTimeouts = {}
 	this._scheduleCheckSession = function(session) {
-		if (session.timeout) { clearTimeout(session.timeout) }
-		session.timeout = setTimeout(bind(this, function() {
-			delete session.timeout
+		var timeout = this._sessionTimeouts[session.id]
+		if (timeout) { clearTimeout(timeout) }
+		this._sessionTimeouts[session.id] = setTimeout(bind(this, function() {
+			delete this._sessionTimeouts[session.id]
 			if (session.sockets.length) { return }
 			this._broadcast('SessionDead', session)
 			delete this._sessions[session.id]
@@ -113,7 +117,8 @@ module.exports = Class(function() {
 
 	this._createClientSession = function(socketID, clientInfo, callback) {
 		// todo read navigator out of clientInfo
-		var session = { id:new Date().getTime()+'-'+Math.random(), navigator:'Unknown', sockets:[socketID] }
+		var randomColor = '#'+(0x1000000+(Math.random())*0xffffff).toString(16).substr(1,6),
+			session = { id:new Date().getTime()+'-'+Math.random(), clientInfo:clientInfo, sockets:[socketID], color:randomColor }
 		this._sessions[session.id] = session
 		this._sessionEvents[session.id] = []
 		this._socketToSession[socketID] = session
@@ -127,6 +132,7 @@ module.exports = Class(function() {
 			this._socketToSession[socketID] = session
 			session.sockets.push(socketID)
 			callback(true)
+			this._broadcast('SessionInfo', session)
 		} else {
 			console.log("REGISTER BAD SESSION", socketID, sessionID)
 			callback(false)
@@ -136,24 +142,30 @@ module.exports = Class(function() {
 	this._withSession = function(socketID, callback) {
 		var session = this._socketToSession[socketID]
 		if (!session) { return }
-		callback(session)
+		callback.call(this, session)
 	}
 	
-	this._withSessionSockets = function(sessionID, callback) {
-		var session = this._sessions[sessionID]
+	this._withSessionSockets = function(session, callback) {
 		if (!session) { return }
-		each(session.sockets, callback)
+		each(session.sockets, this, function(socketID) {
+			callback.call(this, this._clientSockets[socketID])
+		})
 	}
 	
 	this._registerClientEvent = function(socketID, clientEvent) {
 		var session = this._socketToSession[socketID]
 		if (!session) {
 			console.error("BAD SESSION", socketID)
-			// var socket = this._clientSockets[socketID]
-			// if (socket) { socket.emit('BadSession') }
 			return
 		}
+		clientEvent.socketID = socketID
+		this._registerSessionEvent(session, clientEvent)
+	}
+	
+	this._registerSessionEvent = function(session, clientEvent) {
+		if (!session) { return console.log("BAD SESSION", new Error().stack) }
 		clientEvent.sessionID = session.id
+		clientEvent.args = clientEvent.args || []
 		this._sessionEvents[session.id].push(clientEvent)
 		this._broadcast('ClientEvent', clientEvent)
 	}
@@ -178,10 +190,17 @@ module.exports = Class(function() {
 	}
 
 	this._handleConsoleCommand = function(message, callback) {
-		this._withSessionSockets(message.sessionID, function(clientSocket) {
-			clientSocket.emit('ExecuteClientCommand', message.command, function(data) {
-				this._broadcast('Response', { response:response, requestID:message.requestID })
-			})
+		var commandID = unique(),
+			session = this._sessions[message.sessionID]
+		this._registerSessionEvent(session, { type:'command', command:message.command, commandID:commandID })
+		this._withSessionSockets(session, function(clientSocket) {
+			clientSocket.emit('ExecuteCommand', { command:message.command, commandID:commandID })
+		})
+	}
+	
+	this._onCommandResponse = function(socketID, response) {
+		this._withSession(socketID, function(session) {
+			this._registerSessionEvent(session, { type:'response', commandID:response.commandID, args:[response.err, response.value] })
 		})
 	}
 	

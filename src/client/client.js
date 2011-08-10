@@ -13,12 +13,13 @@
 		})
 		
 		overwriteConsole(function(type, args) {
-			session.registerEvent('console-log', args)
+			session.registerEvent('console.log', args)
 		})
 		
-		session.on('ExecuteClientCommand', function (command, callback) {
-			try { callback({ value:eval(command) }) }
-			catch(error) { callback({ error:error }) }
+		session.on('ExecuteCommand', function (message, callback) {
+			try { var value = eval(message.command) }
+			catch(err) { var error = err }
+			session.emit('CommandResponse', { value:value, error:error, commandID:message.commandID })
 		})
 	})
 })()

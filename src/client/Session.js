@@ -35,9 +35,10 @@ module.exports = Class(function () {
 		}))
 	}
 	
-	this.registerEvent = function(type, data) {
-		this._socket.emit('ClientEvent', { type:type, data:data })
+	this.registerEvent = function(type, args) {
+		this._socket.emit('ClientEvent', { type:type, args:args })
 	}
 	
 	this.on = function() { this._socket.on.apply(this._socket, arguments) }
+	this.emit = function() { this._socket.emit.apply(this._socket, arguments) }
 })
