@@ -1,6 +1,7 @@
 var store = require('store'),
 	Class = require('std/Class'),
-	bind = require('std/bind')
+	bind = require('std/bind'),
+	client = require('std/client')
 
 require('socket.io/node_modules/socket.io-client/dist/socket.io') // exposes "io" globally
 
@@ -27,7 +28,7 @@ module.exports = Class(function () {
 	}
 	
 	this._createSession = function() {
-		var clientInfo = {}
+		var clientInfo = { name:client.name || 'Unknown', version:client.version }
 		this._socket.emit('CreateSession', clientInfo, bind(this, function(sessionID) {
 			store.set(this._storeName, sessionID)
 			this._connectCallback()
