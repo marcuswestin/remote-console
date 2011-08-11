@@ -10,7 +10,7 @@ var express = require('express'),
 
 module.exports = Class(function() {
 	
-	this._sessionTimeout = 10 + time.seconds
+	this._sessionTimeout = 30 + time.seconds
 	
 	this.init = function() {
 		this._sessions = {}
@@ -192,7 +192,7 @@ module.exports = Class(function() {
 	this._handleConsoleCommand = function(message, callback) {
 		var commandID = unique(),
 			session = this._sessions[message.sessionID]
-		this._registerSessionEvent(session, { type:'command', command:message.command, commandID:commandID })
+		this._registerSessionEvent(session, { type:'command', args:[message.command], commandID:commandID })
 		this._withSessionSockets(session, function(clientSocket) {
 			clientSocket.emit('ExecuteCommand', { command:message.command, commandID:commandID })
 		})
