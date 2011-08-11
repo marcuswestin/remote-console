@@ -2,7 +2,7 @@
   "author": "Marcus Westin <narcvs@gmail.com> (http://marcuswest.in)",
   "name": "remote-console",
   "description": "A remote console for webapp development",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "repository": {
     "url": ""
   },
@@ -13,5 +13,9 @@
     "std":"0.1.x",
     "ui":"0.2.x",
     "store":"1.1.x"
-  }
+  },
+  "scripts": {
+    "install":"./src/build.js"
+  },
+  "bin": "./src/run.js"
 }

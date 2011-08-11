@@ -39,10 +39,15 @@ module.exports = Class(function() {
 		this
 			._route('/', redirect('/console/'))
 			
+			._route('/test/', bind(this, this._serveFile, 'src/client/test.html', 'text/html'))
+			._route('/test', redirect('/test/'))
+
+			._route('/client.js', bind(this, this._serveFile, 'build/client.js', 'application/javascript'))
 			._route('/client/', bind(this, this._serveFile, 'src/client/client.html', 'text/html'))
 			._route('/client', redirect('/client/'))
 			
 			._route('/console/console.css', bind(this, this._serveFile, 'src/console/console.css', 'text/css'))
+			._route('/console/console.js', bind(this, this._serveFile, 'build/console.js', 'text/css'))
 			._route('/console/', bind(this, this._serveFile, 'src/console/console.html', 'text/html'))
 			._route('/console', redirect('/console/'))
 			
@@ -55,7 +60,7 @@ module.exports = Class(function() {
 	}
 	
 	this._serveFile = function(path, contentType, req, res, next) {
-		fs.readFile(path, 'utf8', function(err, content) {
+		fs.readFile(__dirname + '/../../' + path, 'utf8', function(err, content) {
 			if (err) { res.writeHead(400); res.end(); return }
 			res.writeHead(200, { 'Content-Type':contentType })
 			res.end(content)
